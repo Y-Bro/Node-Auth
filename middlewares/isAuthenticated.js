@@ -10,7 +10,12 @@ export const isAuthenticated = catchAsyncErrors (async(req,res,next)=>{
         return res.send("Please login");
     }
 
-    const payload = jwt.verify(token,process.env.JWT_SECRET);
+    const payload = jwt.verify(token,process.env.JWT_SECRET,(err,res)=>{
+        if(err)
+        {
+            return res.status(403).send("Token not valid");
+        }
+    });
     req.user = await User.findById(payload.id);
 
     next();
