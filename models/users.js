@@ -8,41 +8,61 @@ const Schema = mongoose.Schema;
 const userSchema = new Schema({
     name: {
         type: String,
-        required: [true, "PLEASE ENTER NAME"]
     },
 
     email: {
         type: String,
-        required: [true, "Please enter email"]
     },
 
     password: {
         type: String,
-        required: [true, "Please enter password"]
     },
 
-    resetPasswordToken : String,
-    resetTokenExpire : Date
+    resetPasswordToken: String,
+    resetTokenExpire: Date,
+
+    lastFivePass: {
+        type: Array,
+        maxlength: 5
+    }
 
 }, { timestamps: true });
 
-userSchema.pre("save",async function(next){
-    if(!this.isModified("password")){
+userSchema.pre("save", async function (next) {
+    if (!this.isModified("password")) {
         next();
     }
+    this.password = await bcrypt.hash(this.password, 10);
 
-   this.password = await bcrypt.hash(this.password,10);
+    this.lastFivePass.length<5 ? this.lastFivePass.push(this.password) : ()=>{
+        this.lastFivePass.shift(); 
+        this.lastFivePass.push(this.password);}
 })
 
-userSchema.methods.getJwtToken = function(){
-    return jwt.sign({id:this._id},process.env.JWT_SECRET,{expiresIn:"2m"});
+userSchema.methods.getJwtToken = function () {
+    return jwt.sign({ id: this._id }, process.env.JWT_SECRET, { expiresIn: "2m" });
 }
 
-userSchema.methods.comparePass = async function(password){
-    return bcrypt.compare(password,this.password);
+userSchema.methods.comparePass = async function (password) {
+    return bcrypt.compare(password, this.password);
 }
 
-userSchema.methods.getResetToken = function(){
+
+userSchema.methods.compareLastFive = async function (password) {
+    let canChange = true;
+   for(let i =0 ; i<this.lastFivePass.length; i++){
+       const isSame = await bcrypt.compare(password,this.lastFivePass[i]);
+       if(isSame){
+           canChange = false;
+       }
+
+       
+   } return canChange;
+
+    
+}
+
+userSchema.methods.getResetToken = function () {
 
     let token = crypto.randomBytes(64).toString("hex");
 
@@ -55,4 +75,4 @@ userSchema.methods.getResetToken = function(){
 
 }
 
-export const User = mongoose.model("users",userSchema,"Users");
+export const User = mongoose.model("users", userSchema, "Users");

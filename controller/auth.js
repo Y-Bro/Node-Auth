@@ -1,10 +1,21 @@
 import { User } from "../models/users.js";
+import validators from "./validators/index.js";
 import { sendToken } from "../utils/jwtToken.js";
 import catchAsyncErrors from "../middlewares/catchAsyncErrors.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import crypto from "crypto"
 
 export const signUp = catchAsyncErrors(async (req, res, next) => {
+
+    // try{
+    // console.log("here");
+    validators.signUpValidation(req.body, res);
+    // }catch(error){
+    //     console.log("here in controller error");
+    //    return res.send(error);
+    // }
+
+
     let { name, email, password } = req.body;
     let user;
 
@@ -101,17 +112,18 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
     }
 })
 
-export const resetPassword = catchAsyncErrors(async(req,res,next)=>{
+export const resetPassword = catchAsyncErrors(async (req, res, next) => {
     const token = req.params.token;
 
     const resetPasswordToken = crypto.createHash("sha256").update(token).digest("hex");
 
     console.log(resetPasswordToken);
 
-    let user = await User.findOne({resetPasswordToken,
-        resetTokenExpire : {$gt : Date.now()}
+    let user = await User.findOne({
+        resetPasswordToken,
+        resetTokenExpire: { $gt: Date.now() }
     })
-    if(!user){
+    if (!user) {
         return res.send("Token Expired/Invalid reset token");
     }
 
@@ -121,5 +133,39 @@ export const resetPassword = catchAsyncErrors(async(req,res,next)=>{
 
     await user.save();
 
-    sendToken(user,200,res);
+    sendToken(user, 200, res);
 })
+
+export const changePassword = catchAsyncErrors(async (req, res) => {
+    const { email, currentPassword, newPassword } = req.body;
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+        return res.send("User not found");
+    }
+
+    const isPassword = await user.comparePass(currentPassword);
+
+    if (!isPassword) {
+        return res.send("Invalid Details");
+    }
+
+    const canChange = await user.compareLastFive(newPassword);
+
+    if (!canChange) {
+        return res.send("Password should not be the same as your last 5 passwords");
+    }
+
+    user.password = newPassword;
+
+    await user.save({ validateBeforeSave: true });
+
+    res.send(user);
+
+})
+
+
+export const xyz = (req, res) => {
+    res.send("ye");
+}
